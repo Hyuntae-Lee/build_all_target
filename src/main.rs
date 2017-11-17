@@ -31,16 +31,7 @@ fn main() {
     }
 
     // get output
-    // - prepare output directory
-    if let Err(_) = fs::create_dir(out_dir_path) {
-        // do nothing
-    }
-    // - rebuild project
-    println!("Rebuild project ...");
-    Command::new("clean_build_workspace.bat")
-            .output()
-            .expect("failed to execute process");
-    // - build and get binaries
+    prepare_to_build(out_dir_path);
     for target in target_list {
         let mut model_str = target.clone();
         let out_file_name = model_str.split_off(model_label_prefix.len());
@@ -48,21 +39,11 @@ fn main() {
         // display progress
         println!("... {}", out_file_name);
 
-        // change target
-        let target_set_txt = format!("{}({})", fn_model_set, target);
-        let cur_target_set_txt
-            = match prj_info::get_model_setting_txt(main_file_path, fn_model_set) {
-            None => {
-                continue;
-            },
-            Some(x) => x
-        };
-        fnr::find_text_and_replace(main_file_path, &cur_target_set_txt, &target_set_txt);
-
         // build
-        Command::new("build_workspace.bat")
-                .output()
-                .expect("failed to execute process");
+        if build_for_target(&target, fn_model_set, main_file_path) != true {
+            continue;
+        }
+
         // collect output
         let out_bin_file_path = format!("{}\\{}_{}.bin", out_dir_path, out_file_name, ver_str);
         if let Err(_) = fs::copy(out_file_path, out_bin_file_path) {
@@ -80,4 +61,35 @@ fn parse_input<'a>(input : &'a Vec<String>)
 
     return Ok((&input[1], &input[2], &input[3], &input[4], &input[5], &input[6], &input[7],
             &input[8], &input[9], &input[10], &input[11]));
+}
+
+fn prepare_to_build(out_dir_path : &str) {
+    if let Err(_) = fs::create_dir(out_dir_path) {
+        // do nothing
+    }
+    // - rebuild project
+    println!("Rebuild project ...");
+    Command::new("clean_build_workspace.bat")
+            .output()
+            .expect("failed to execute process");
+}
+
+fn build_for_target(target : &str, fn_model_set : &str, main_file_path : &str) -> bool {
+    // change target
+    let target_set_txt = format!("{}({})", fn_model_set, target);
+    let cur_target_set_txt
+        = match prj_info::get_model_setting_txt(main_file_path, fn_model_set) {
+        None => {
+            return false;
+        },
+        Some(x) => x
+    };
+    fnr::find_text_and_replace(main_file_path, &cur_target_set_txt, &target_set_txt);
+
+    // build
+    Command::new("build_workspace.bat")
+            .output()
+            .expect("failed to execute process");
+
+    return true;
 }
